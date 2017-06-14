@@ -1,75 +1,66 @@
 #!/usr/bin/env bash
-# bin/compile <build-dir> <cache-dir> <env-dir>
+# bin/compile <build-dir> <cache-dir>
 
-set -e   # fail fast
-# set -x # enable debugging
+# Fail fast
+set -e
 
-# Configure directories
+# Debug
+# set -x
+
+# Parse and derive params
 BUILD_DIR=$1
 CACHE_DIR=$2
-ENV_DIR=$3
 BUILDPACK_DIR=`cd $(dirname $0); cd ..; pwd`
 
-# Load some convenience functions like topic(), echo(), and indent()
+# Load formating tools
 source $BUILDPACK_DIR/bin/common.sh
 
-# Apt settings
-APT_BUILD_DIR="$BUILD_DIR/.apt"
+# Setup apt environment
 APT_CACHE_DIR="$CACHE_DIR/apt/cache"
 APT_STATE_DIR="$CACHE_DIR/apt/state"
-APT_REPO_FILE="$BUILDPACK_DIR/etc/datadog.list"
+APT_OPTIONS="-o debug::nolocking=true -o dir::cache=$APT_CACHE_DIR -o dir::state=$APT_STATE_DIR"
 
-
-GPG_HOME_DIR="$BUILD_DIR/.gnupg"
-GPG_KEYRING_FILE="$BUILD_DIR/.apt/trusted.gpg"
-GPG_KEY_FILE="$BUILDPACK_DIR/etc/datadog.gpg"
-
-
-APT_OPTIONS="-o debug::nolocking=true -o Dir::Etc::Trusted=$GPG_KEYRING_FILE -o Dir::Etc::SourceList=$APT_REPO_FILE -o dir::cache=$APT_CACHE_DIR -o dir::state=$APT_STATE_DIR"
-
-# Where the Agent is installed & configured
-DD_AGENT_ROOT="$APT_BUILD_DIR"
-DD_AGENT_CONF="$DD_AGENT_ROOT/opt/datadog-agent/agent/datadog.conf"
-DD_LOG_DIR="/tmp/logs/datadog"
-
-# Ensure directories exists
-mkdir -p "$CACHE_DIR"
-mkdir -p "$APT_BUILD_DIR"
 mkdir -p "$APT_CACHE_DIR/archives/partial"
 mkdir -p "$APT_STATE_DIR/lists/partial"
-mkdir -p "$DD_AGENT_ROOT"
-mkdir -p "$GPG_HOME_DIR"
-
-topic "Adding GPG keys"
-# This mimics the behavior of apt-key add to create a non-standard keyring and
-# import the datadog key into it.
-gpg --ignore-time-conflict --no-options --no-default-keyring --homedir $GPG_HOME_DIR --keyring $GPG_KEYRING_FILE --import $GPG_KEY_FILE | indent
+mkdir -p $BUILD_DIR/.apt
+mkdir -p $BUILD_DIR/.profile.d
 
 topic "Updating apt caches"
 apt-get $APT_OPTIONS update | indent
 
-# Installing the Datadog Trace Agent will also install the Datadog Agent.
-topic "Fetching Datadog Agent and Trace Agent"
-apt-get $APT_OPTIONS -y --force-yes -d install --reinstall --no-install-recommends datadog-agent | indent
+topic "Fetching .debs for libsensors4 and sysstat"
+apt-get $APT_OPTIONS -y --force-yes -d install --reinstall libsensors4 | indent
+apt-get $APT_OPTIONS -y --force-yes -d install --reinstall sysstat | indent
 
-# Install the latest agent package.
-topic "Fetching deb packages"
-DEB=$(ls -t $APT_CACHE_DIR/archives/*.deb | head -n 1)
-topic "Installing $(basename $DEB)"
-dpkg -x $DEB $BUILD_DIR/.apt/
+topic "Installing libsensors4 and sysstat"
+dpkg -x $APT_CACHE_DIR/archives/libsensors4*.deb $BUILD_DIR/.apt/
+dpkg -x $APT_CACHE_DIR/archives/sysstat*.deb $BUILD_DIR/.apt/
 
-mv $DD_AGENT_ROOT/etc/dd-agent/datadog.conf.example $DD_AGENT_CONF
+topic "Writing profile script"
+cat <<EOF >$BUILD_DIR/.profile.d/000_apt.sh
+export PATH="\$HOME/.apt/usr/bin:\$PATH"
+export LD_LIBRARY_PATH="\$HOME/.apt/usr/lib/x86_64-linux-gnu:\$HOME/.apt/usr/lib/i386-linux-gnu:\$HOME/.apt/usr/lib:\$LD_LIBRARY_PATH"
+export LIBRARY_PATH="\$HOME/.apt/usr/lib/x86_64-linux-gnu:\$HOME/.apt/usr/lib/i386-linux-gnu:\$HOME/.apt/usr/lib:\$LIBRARY_PATH"
+export INCLUDE_PATH="\$HOME/.apt/usr/include:\$HOME/.apt/usr/include/x86_64-linux-gnu:\$INCLUDE_PATH"
+export CPATH="\$INCLUDE_PATH"
+export CPPPATH="\$INCLUDE_PATH"
+export PKG_CONFIG_PATH="\$HOME/.apt/usr/lib/x86_64-linux-gnu/pkgconfig:\$HOME/.apt/usr/lib/i386-linux-gnu/pkgconfig:\$HOME/.apt/usr/lib/pkgconfig:\$PKG_CONFIG_PATH"
+EOF
 
-# Turn off syslog
-sed -i -e"s/^.*log_to_syslog:.*$/log_to_syslog: no/" $DD_AGENT_CONF
+# Export vars for subsequent work
+export PATH="$BUILD_DIR/.apt/usr/bin:$PATH"
+export LD_LIBRARY_PATH="$BUILD_DIR/.apt/usr/lib/x86_64-linux-gnu:$BUILD_DIR/.apt/usr/lib/i386-linux-gnu:$BUILD_DIR/.apt/usr/lib:$LD_LIBRARY_PATH"
+export LIBRARY_PATH="$BUILD_DIR/.apt/usr/lib/x86_64-linux-gnu:$BUILD_DIR/.apt/usr/lib/i386-linux-gnu:$BUILD_DIR/.apt/usr/lib:$LIBRARY_PATH"
+export INCLUDE_PATH="$BUILD_DIR/.apt/usr/include:$BUILD_DIR/.apt/usr/include/x86_64-linux-gnu:$INCLUDE_PATH"
+export CPATH="$INCLUDE_PATH"
+export CPPPATH="$INCLUDE_PATH"
+export PKG_CONFIG_PATH="$BUILD_DIR/.apt/usr/lib/x86_64-linux-gnu/pkgconfig:$BUILD_DIR/.apt/usr/lib/i386-linux-gnu/pkgconfig:$BUILD_DIR/.apt/usr/lib/pkgconfig:$PKG_CONFIG_PATH"
 
-# Fix log locations
-sed -i -e"s|^.*collector_log_file:.*$|collector_log_file: $DD_LOG_DIR/collector.log|" $DD_AGENT_CONF
-sed -i -e"s|^.*forwarder_log_file:.*$|forwarder_log_file: $DD_LOG_DIR/forwarder.log|" $DD_AGENT_CONF
-sed -i -e"s|^.*dogstatsd_log_file:.*$|dogstatsd_log_file: $DD_LOG_DIR/dogstatsd.log|" $DD_AGENT_CONF
+topic "Rewrite package-config files"
+find $BUILD_DIR/.apt -type f -ipath '*/pkgconfig/*.pc' | xargs --no-run-if-empty -n 1 sed -i -e 's!^prefix=\(.*\)$!prefix='"$BUILD_DIR"'/.apt\1!g'
 
-# Drop off the runner
-mkdir -p $BUILD_DIR/.profile.d
-cp $BUILDPACK_DIR/extra/run-dogstatsd.sh $BUILD_DIR/.profile.d/
-chmod +x $BUILD_DIR/.profile.d/run-dogstatsd.sh
-topic "Datadog Agent and Trace Agent packages installed"
+topic "Installing Datadog Agent"
+# Need to test here for DD_API_KEY
+export DD_HOME="$BUILD_DIR/.datadog-agent"
+export DD_START_AGENT=0
+sh -c "$(curl -L https://raw.githubusercontent.com/DataDog/dd-agent/master/packaging/datadog-agent/source/setup_agent.sh)"
