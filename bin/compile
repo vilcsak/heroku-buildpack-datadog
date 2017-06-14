@@ -56,6 +56,8 @@ sh -c "$(curl -L https://raw.githubusercontent.com/DataDog/dd-agent/master/packa
 
 topic "Rewrite Datadog files"
 find $DD_AGENT -type f | xargs --no-run-if-empty -n 1 sed -i -e 's!'"$BUILD_DIR"'!/app!g'
+topic "Remove compiled python"
+find $DD_AGENT -type f -name "*.pyc" -delete
 
 topic "Writing profile script"
 cat <<EOF >$BUILD_DIR/.profile.d/datadog.sh
