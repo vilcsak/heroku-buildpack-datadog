@@ -60,6 +60,10 @@ topic "Rewrite package-config files"
 find $BUILD_DIR/.apt -type f -ipath '*/pkgconfig/*.pc' | xargs --no-run-if-empty -n 1 sed -i -e 's!^prefix=\(.*\)$!prefix='"$BUILD_DIR"'/.apt\1!g'
 
 topic "Installing Datadog Agent"
-export DD_HOME="/app/.datadog-agent"
+DD_AGENT="$BUILD_DIR/.datadog-agent"
+export DD_HOME="$DD_AGENT"
 export DD_START_AGENT=0
 sh -c "$(curl -L https://raw.githubusercontent.com/DataDog/dd-agent/master/packaging/datadog-agent/source/setup_agent.sh)"
+
+topic "Rewrite Datadog files"
+find $DD_AGENT -type f | xargs sed -i "s/$BUID_DIR/\/app/g"
