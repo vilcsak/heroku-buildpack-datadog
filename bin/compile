@@ -53,6 +53,7 @@ DD_AGENT="$BUILD_DIR/.datadog-agent"
 export DD_HOME="$DD_AGENT"
 export DD_START_AGENT=0
 sh -c "$(curl -L https://raw.githubusercontent.com/DataDog/dd-agent/master/packaging/datadog-agent/source/setup_agent.sh)"
+cp $DD_AGENT/agent/datadog.conf.example $DD_AGENT/agent/datadog.conf
 
 topic "Rewrite Datadog files"
 find $DD_AGENT -type f | xargs --no-run-if-empty -n 1 sed -i -e 's!'"$BUILD_DIR"'!/app!g'
@@ -69,5 +70,7 @@ export CPATH="\$INCLUDE_PATH"
 export CPPPATH="\$INCLUDE_PATH"
 export PKG_CONFIG_PATH="\$HOME/.apt/usr/lib/x86_64-linux-gnu/pkgconfig:\$HOME/.apt/usr/lib/i386-linux-gnu/pkgconfig:\$HOME/.apt/usr/lib/pkgconfig:\$PKG_CONFIG_PATH"
 
+# Determine if the Agent actually needs all that ^^
+sed -i "s/^api_key:$/\$DD_API_KEY/g" /app/.datadog-agent/agent/datadog.conf
 /app/.datadog-agent/bin/agent
 EOF
