@@ -72,5 +72,6 @@ export PKG_CONFIG_PATH="\$HOME/.apt/usr/lib/x86_64-linux-gnu/pkgconfig:\$HOME/.a
 
 # Determine if the Agent actually needs all that ^^
 sed -i "s/^api_key:$/api_key: \$DD_API_KEY/g" /app/.datadog-agent/agent/datadog.conf
-#/app/.datadog-agent/bin/agent
+
+/app/.datadog-agent/bin/agent
 EOF
