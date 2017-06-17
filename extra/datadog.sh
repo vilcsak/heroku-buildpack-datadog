@@ -12,20 +12,21 @@ export PKG_CONFIG_PATH="$HOME/.apt/usr/lib/x86_64-linux-gnu/pkgconfig:$HOME/.apt
 DDCONF="/app/.datadog-agent/agent/datadog.conf"
 
 # Set the Dyno tags
-DYNOHOST="$(hostname)"
+DYNOHOST="$( hostname )"
 sed -i "s/^[# ]*tags:.*$/tags: dyno:$DYNO, dynohost:$DYNOHOST/" $DDCONF
 
 # Update the Datadog conf file with any env vars named DD_*
+IFS=$'\n'
 for e in $( env ); do
   if [[ $e == DD_* ]]; then 
     # Just grab the varname
-    VARNAME=${e%=*}
+    VARNAME=${e%%=*}
     VARVALUE=${e#*=}
     CONFSTRING="$( echo ${VARNAME#*_} | tr '[:upper:]' '[:lower:]' )"
 
     # Append any tags, otherwise overwrite values
     if [ "$VARNAME" == "DD_TAGS" ]; then
-      sed -i -e "s!^(tags:.*)!\1, $VARVALUE!" $DDCONF
+      sed -i -e "s!^\(tags:.*\)!\1, $VARVALUE!" $DDCONF
     else
       sed -i -e "s!^[# ]*$CONFSTRING:.*!$CONFSTRING: $VARVALUE!" $DDCONF
     fi
