@@ -32,17 +32,17 @@ for e in $( env ); do
   fi
 done
 
-if [ -z $DD_API_KEY ]; then
+if [ -z "$DD_API_KEY" ]; then
   echo "DD_API_KEY environment variable not set. Run: heroku config:add DD_API_KEY=<your API key>"
   DISABLE_DATADOG_AGENT=1
 fi
 
-if [ -z $DD_HOSTNAME ]; then
+if [ -z "$DD_HOSTNAME" ]; then
   echo 'DD_HOSTNAME environment variable not set. Run: heroku config:set DD_HOSTNAME=$(heroku apps:info|grep ===|cut -d' ' -f2)'
   DISABLE_DATADOG_AGENT=1
 fi
 
-if [ -n $DISABLE_DATADOG_AGENT ]; then
+if [ -n "$DISABLE_DATADOG_AGENT" ]; then
   echo "The Datadog Agent has been disabled. Unset the DISABLE_DATADOG_AGENT or set missing environment variables."
 else
   # Run the Datadog Agent
