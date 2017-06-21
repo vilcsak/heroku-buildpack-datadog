@@ -16,14 +16,24 @@ BUILDPACK_DIR=`cd $(dirname $0); cd ..; pwd`
 source $BUILDPACK_DIR/bin/common.sh
 
 # Setup apt environment
+APT_BUILD_DIR="$BUILD_DIR/.apt"
 APT_CACHE_DIR="$CACHE_DIR/apt/cache"
 APT_STATE_DIR="$CACHE_DIR/apt/state"
-APT_OPTIONS="-o debug::nolocking=true -o dir::cache=$APT_CACHE_DIR -o dir::state=$APT_STATE_DIR"
+APT_REPO_FILE="$BUILDPACK_DIR/etc/datadog.list"
+GPG_HOME_DIR="$BUILD_DIR/.gnupg"
+GPG_KEYRING_FILE="$BUILD_DIR/.apt/trusted.gpg"
+GPG_KEY_FILE="$BUILDPACK_DIR/etc/datadog.gpg"
 
+APT_OPTIONS="-o debug::nolocking=true -o Dir::Etc::Trusted=$GPG_KEYRING_FILE -o Dir::Etc::SourceList=$APT_REPO_FILE -o dir::cache=$APT_CACHE_DIR -o dir::state=$APT_STATE_DIR"
+
+mkdir -p $APT_BUILD_DIR
 mkdir -p "$APT_CACHE_DIR/archives/partial"
 mkdir -p "$APT_STATE_DIR/lists/partial"
-mkdir -p $BUILD_DIR/.apt
-mkdir -p $BUILD_DIR/.profile.d
+mkdir -p $GPG_HOME_DIR
+mkdir -p "$BUILD_DIR/.profile.d"
+
+topic "Adding GPG keys"
+gpg --ignore-time-conflict --no-options --no-default-keyring --homedir $GPG_HOME_DIR --keyring $GPG_KEYRING_FILE --import $GPG_KEY_FILE | indent
 
 topic "Updating apt caches"
 apt-get $APT_OPTIONS update | indent
@@ -52,6 +62,10 @@ topic "Installing Datadog Agent"
 DD_AGENT="$BUILD_DIR/.datadog-agent"
 export DD_HOME="$DD_AGENT"
 export DD_START_AGENT=0
+# If an agent version is specified, set the expected (unprefixed) env var
+if [ -n $DD_AGENT_VERSION ]; then
+  export AGENT_VERSION=$DD_AGENT_VERSION
+fi
 sh -c "$(curl -L https://raw.githubusercontent.com/DataDog/dd-agent/master/packaging/datadog-agent/source/setup_agent.sh)"
 cp $DD_AGENT/agent/datadog.conf.example $DD_AGENT/agent/datadog.conf
 
@@ -60,6 +74,14 @@ cp $DD_AGENT/agent/datadog.conf.example $DD_AGENT/agent/datadog.conf
 topic "Rewrite Datadog files & remove compile python"
 find $DD_AGENT -type f | xargs --no-run-if-empty -n 1 sed -i -e 's!'"$BUILD_DIR"'!/app!g'
 find $DD_AGENT -type f -name "*.pyc" -delete
+
+# Download Datadog Trace Agent and move into place.
+DD_TMP="$BUILD_DIR/dd-tmp"
+apt-get $APT_OPTIONS -y --force-yes -d install --reinstall datadog-agent | indent
+dpkg -x $APT_CACHE_DIR/archives/sysstat*.deb $DD_TMP
+
+# Trace agent should be in /app/.datadog-agent/bin/trace-agent
+#mv ?? $DD_AGENT/bin/trace-agent
 
 topic "Writing profile script"
 mv $BUILDPACK_DIR/extra/datadog.sh $BUILD_DIR/.profile.d/datadog.sh
