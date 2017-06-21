@@ -70,6 +70,7 @@ find $DD_AGENT -type f -name "*.pyc" -delete
 GPG_HOME_DIR="$BUILD_DIR/.gnupg"
 GPG_KEYRING_FILE="$BUILD_DIR/.apt/trusted.gpg"
 GPG_KEY_FILE="$BUILDPACK_DIR/etc/datadog.gpg"
+APT_REPO_FILE="$BUILDPACK_DIR/etc/datadog.list"
 APT_OPTIONS="-o debug::nolocking=true -o Dir::Etc::Trusted=$GPG_KEYRING_FILE -o Dir::Etc::SourceList=$APT_REPO_FILE -o dir::cache=$APT_CACHE_DIR -o dir::state=$APT_STATE_DIR"
 DD_TMP="$BUILD_DIR/.dd_tmp"
 mkdir -p $DD_TMP
