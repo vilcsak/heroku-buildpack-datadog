@@ -54,7 +54,7 @@ DD_AGENT="$BUILD_DIR/.datadog-agent"
 export DD_HOME="$DD_AGENT"
 export DD_START_AGENT=0
 # If an agent version is specified, set the expected (unprefixed) env var
-if [ -n $DD_AGENT_VERSION ]; then
+if [ -n "$DD_AGENT_VERSION" ]; then
   export AGENT_VERSION=$DD_AGENT_VERSION
 fi
 sh -c "$(curl -L https://raw.githubusercontent.com/DataDog/dd-agent/master/packaging/datadog-agent/source/setup_agent.sh)"
@@ -82,7 +82,7 @@ ls $APT_CACHE_DIR/archives/datadog*.deb | indent
 
 #Install the correct version of the Agent deb
 echo "AGENT VERSION: $DD_AGENT_VERSION"
-if [ -n $DD_AGENT_VERSION ]; then
+if [ -n "$DD_AGENT_VERSION" ]; then
   DEB=$(ls -t $APT_CACHE_DIR/archives/datadog-agent_1%3a$DD_AGENT_VERSION-*.deb | head -n 1)
 else
   DEB=$(ls -t $APT_CACHE_DIR/archives/datadog-agent*.deb | head -n 1)
