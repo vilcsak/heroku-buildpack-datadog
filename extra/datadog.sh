@@ -9,6 +9,7 @@ export CPATH="$INCLUDE_PATH"
 export CPPPATH="$INCLUDE_PATH"
 export PKG_CONFIG_PATH="$HOME/.apt/usr/lib/x86_64-linux-gnu/pkgconfig:$HOME/.apt/usr/lib/i386-linux-gnu/pkgconfig:$HOME/.apt/usr/lib/pkgconfig:$PKG_CONFIG_PATH"
 
+DDBIN="/app/.datadog-agent/bin"
 DDCONF="/app/.datadog-agent/agent/datadog.conf"
 
 # Set the Dyno tags
@@ -48,5 +49,14 @@ if [ -n "$DISABLE_DATADOG_AGENT" ]; then
 else
   # Run the Datadog Agent
   echo "Starting Datadog Agent on dyno $DYNO"
-  /app/.datadog-agent/bin/agent &
+  $DDBIN/agent &
+fi
+
+if [ -z "$DD_APM_ENABLED" ] || [ -n "$DISABLE_DATADOG_AGENT" ]; then
+  echo "The Datadog Trace Agent has been disabled. Run: heroku config:set DD_APM_ENABLED='true'"
+  echo "Also ensure that the DISABLE_DATADOG_AGENT environment variable is not set and set any missing environment variables."
+else
+  # Run the Datadog Trace Agent
+  echo "Starting Datadog Trace Agent on dyno $DYNO"
+  $DDBIN/trace-agent -ddconfig $DDCONF &
 fi
