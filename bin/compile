@@ -78,7 +78,6 @@ mkdir -p $DD_TMP
 mkdir -p $GPG_HOME_DIR
 apt-get $APT_OPTIONS update | indent
 apt-get $APT_OPTIONS -y --force-yes -d install --reinstall datadog-agent | indent
-ls $APT_CACHE_DIR/archives/datadog*.deb | indent
 
 #Install the correct version of the Agent deb
 echo "AGENT VERSION: $DD_AGENT_VERSION"
@@ -87,8 +86,7 @@ if [ -n "$DD_AGENT_VERSION" ]; then
 else
   DEB=$(ls -t $APT_CACHE_DIR/archives/datadog-agent*.deb | head -n 1)
 fi
-echo "PACKAGE: $DEB"
-#dpkg -x $DEB $DD_TMP
+dpkg -x $DEB $DD_TMP
 
 # Trace agent should be in /app/.datadog-agent/bin/trace-agent
 #mv ?? $DD_AGENT/bin/trace-agent
