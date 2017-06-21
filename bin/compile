@@ -16,24 +16,15 @@ BUILDPACK_DIR=`cd $(dirname $0); cd ..; pwd`
 source $BUILDPACK_DIR/bin/common.sh
 
 # Setup apt environment
-APT_BUILD_DIR="$BUILD_DIR/.apt"
+APT_DIR="$BUILD_DIR/.apt"
 APT_CACHE_DIR="$CACHE_DIR/apt/cache"
 APT_STATE_DIR="$CACHE_DIR/apt/state"
-APT_REPO_FILE="$BUILDPACK_DIR/etc/datadog.list"
-GPG_HOME_DIR="$BUILD_DIR/.gnupg"
-GPG_KEYRING_FILE="$BUILD_DIR/.apt/trusted.gpg"
-GPG_KEY_FILE="$BUILDPACK_DIR/etc/datadog.gpg"
+APT_OPTIONS="-o debug::nolocking=true -o dir::cache=$APT_CACHE_DIR -o dir::state=$APT_STATE_DIR"
 
-APT_OPTIONS="-o debug::nolocking=true -o Dir::Etc::Trusted=$GPG_KEYRING_FILE -o Dir::Etc::SourceList=$APT_REPO_FILE -o dir::cache=$APT_CACHE_DIR -o dir::state=$APT_STATE_DIR"
-
-mkdir -p $APT_BUILD_DIR
-mkdir -p "$APT_CACHE_DIR/archives/partial"
-mkdir -p "$APT_STATE_DIR/lists/partial"
-mkdir -p $GPG_HOME_DIR
-mkdir -p "$BUILD_DIR/.profile.d"
-
-topic "Adding GPG keys"
-gpg --ignore-time-conflict --no-options --no-default-keyring --homedir $GPG_HOME_DIR --keyring $GPG_KEYRING_FILE --import $GPG_KEY_FILE | indent
+mkdir -p $APT_CACHE_DIR/archives/partial
+mkdir -p $APT_STATE_DIR/lists/partial
+mkdir -p $APT_DIR
+mkdir -p $BUILD_DIR/.profile.d
 
 topic "Updating apt caches"
 apt-get $APT_OPTIONS update | indent
@@ -43,20 +34,20 @@ apt-get $APT_OPTIONS -y --force-yes -d install --reinstall libsensors4 | indent
 apt-get $APT_OPTIONS -y --force-yes -d install --reinstall sysstat | indent
 
 topic "Installing libsensors4 and sysstat"
-dpkg -x $APT_CACHE_DIR/archives/libsensors4*.deb $BUILD_DIR/.apt/
-dpkg -x $APT_CACHE_DIR/archives/sysstat*.deb $BUILD_DIR/.apt/
+dpkg -x $APT_CACHE_DIR/archives/libsensors4*.deb $APT_DIR
+dpkg -x $APT_CACHE_DIR/archives/sysstat*.deb $APT_DIR
 
 # Export vars for subsequent work
-export PATH="$BUILD_DIR/.apt/usr/bin:$PATH"
-export LD_LIBRARY_PATH="$BUILD_DIR/.apt/usr/lib/x86_64-linux-gnu:$BUILD_DIR/.apt/usr/lib/i386-linux-gnu:$BUILD_DIR/.apt/usr/lib:$LD_LIBRARY_PATH"
-export LIBRARY_PATH="$BUILD_DIR/.apt/usr/lib/x86_64-linux-gnu:$BUILD_DIR/.apt/usr/lib/i386-linux-gnu:$BUILD_DIR/.apt/usr/lib:$LIBRARY_PATH"
-export INCLUDE_PATH="$BUILD_DIR/.apt/usr/include:$BUILD_DIR/.apt/usr/include/x86_64-linux-gnu:$INCLUDE_PATH"
+export PATH="$APT_DIR/usr/bin:$PATH"
+export LD_LIBRARY_PATH="$APT_DIR/usr/lib/x86_64-linux-gnu:$APT_DIR/usr/lib/i386-linux-gnu:$APT_DIR/usr/lib:$LD_LIBRARY_PATH"
+export LIBRARY_PATH="$APT_DIR/usr/lib/x86_64-linux-gnu:$APT_DIR/usr/lib/i386-linux-gnu:$APT_DIR/usr/lib:$LIBRARY_PATH"
+export INCLUDE_PATH="$APT_DIR/usr/include:$APT_DIR/usr/include/x86_64-linux-gnu:$INCLUDE_PATH"
 export CPATH="$INCLUDE_PATH"
 export CPPPATH="$INCLUDE_PATH"
-export PKG_CONFIG_PATH="$BUILD_DIR/.apt/usr/lib/x86_64-linux-gnu/pkgconfig:$BUILD_DIR/.apt/usr/lib/i386-linux-gnu/pkgconfig:$BUILD_DIR/.apt/usr/lib/pkgconfig:$PKG_CONFIG_PATH"
+export PKG_CONFIG_PATH="$APT_DIR/usr/lib/x86_64-linux-gnu/pkgconfig:$APT_DIR/usr/lib/i386-linux-gnu/pkgconfig:$APT_DIR/usr/lib/pkgconfig:$PKG_CONFIG_PATH"
 
 topic "Rewrite package-config files"
-find $BUILD_DIR/.apt -type f -ipath '*/pkgconfig/*.pc' | xargs --no-run-if-empty -n 1 sed -i -e 's!^prefix=\(.*\)$!prefix='"$BUILD_DIR"'/.apt\1!g'
+find $APT_DIR -type f -ipath '*/pkgconfig/*.pc' | xargs --no-run-if-empty -n 1 sed -i -e 's!^prefix=\(.*\)$!prefix='"$APT_DIR"'\1!g'
 
 topic "Installing Datadog Agent"
 DD_AGENT="$BUILD_DIR/.datadog-agent"
@@ -76,9 +67,15 @@ find $DD_AGENT -type f | xargs --no-run-if-empty -n 1 sed -i -e 's!'"$BUILD_DIR"
 find $DD_AGENT -type f -name "*.pyc" -delete
 
 # Download Datadog Trace Agent and move into place.
-DD_TMP="$BUILD_DIR/dd-tmp"
+GPG_HOME_DIR="$BUILD_DIR/.gnupg"
+GPG_KEYRING_FILE="$BUILD_DIR/.apt/trusted.gpg"
+GPG_KEY_FILE="$BUILDPACK_DIR/etc/datadog.gpg"
+APT_OPTIONS="-o debug::nolocking=true -o Dir::Etc::Trusted=$GPG_KEYRING_FILE -o Dir::Etc::SourceList=$APT_REPO_FILE -o dir::cache=$APT_CACHE_DIR -o dir::state=$APT_STATE_DIR"
+DD_TMP="$BUILD_DIR/.dd_tmp"
+mkdir -p $DD_TMP
+mkdir -p $GPG_HOME_DIR
 apt-get $APT_OPTIONS -y --force-yes -d install --reinstall datadog-agent | indent
-dpkg -x $APT_CACHE_DIR/archives/datadog*.deb $DD_TMP
+dpkg -x $APT_CACHE_DIR/archives/sysstat*.deb $DD_TMP
 
 # Trace agent should be in /app/.datadog-agent/bin/trace-agent
 #mv ?? $DD_AGENT/bin/trace-agent
