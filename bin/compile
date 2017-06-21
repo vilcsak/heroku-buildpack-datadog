@@ -62,7 +62,7 @@ cp $DD_AGENT/agent/datadog.conf.example $DD_AGENT/agent/datadog.conf
 
 # Files are created with the $BUILD_DIR tmp location and need to be updated for /app
 # Precompiled python includes errant tmp location and need to be removed
-topic "Rewrite Datadog files & remove compile python"
+topic "Rewrite Datadog files & remove compiled python"
 find $DD_AGENT -type f | xargs --no-run-if-empty -n 1 sed -i -e 's!'"$BUILD_DIR"'!/app!g'
 find $DD_AGENT -type f -name "*.pyc" -delete
 
@@ -74,6 +74,7 @@ APT_OPTIONS="-o debug::nolocking=true -o Dir::Etc::Trusted=$GPG_KEYRING_FILE -o 
 DD_TMP="$BUILD_DIR/.dd_tmp"
 mkdir -p $DD_TMP
 mkdir -p $GPG_HOME_DIR
+apt-get $APT_OPTIONS update | indent
 apt-get $APT_OPTIONS -y --force-yes -d install --reinstall datadog-agent | indent
 dpkg -x $APT_CACHE_DIR/archives/sysstat*.deb $DD_TMP
 
