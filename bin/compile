@@ -19,11 +19,7 @@ APT_CACHE_DIR="$CACHE_DIR/apt/cache"
 APT_STATE_DIR="$CACHE_DIR/apt/state"
 APT_REPO_FILE="$BUILDPACK_DIR/etc/datadog.list"
 
-GPG_HOME_DIR="$BUILD_DIR/.gnupg"
-GPG_KEYRING_FILE="$BUILD_DIR/.apt/trusted.gpg"
-GPG_KEY_FILE="$BUILDPACK_DIR/etc/datadog.gpg"
-
-APT_OPTIONS="-o debug::nolocking=true -o Dir::Etc::Trusted=$GPG_KEYRING_FILE -o Dir::Etc::SourceList=$APT_REPO_FILE -o dir::cache=$APT_CACHE_DIR -o dir::state=$APT_STATE_DIR"
+APT_OPTIONS="-o debug::nolocking=true -o Dir::Etc::SourceList=$APT_REPO_FILE -o dir::cache=$APT_CACHE_DIR -o dir::state=$APT_STATE_DIR"
 
 # Where the Agent is installed & configured
 DD_AGENT_ROOT="$APT_BUILD_DIR"
@@ -36,12 +32,9 @@ mkdir -p "$APT_BUILD_DIR"
 mkdir -p "$APT_CACHE_DIR/archives/partial"
 mkdir -p "$APT_STATE_DIR/lists/partial"
 mkdir -p "$DD_AGENT_ROOT"
-mkdir -p "$GPG_HOME_DIR"
 
 # Installing the Datadog Trace Agent will also install the Datadog Agent.
 topic "Fetching Datadog Agent and Trace Agent"
-# apt-get $APT_OPTIONS -y --force-yes -d install --reinstall --no-install-recommends datadog-agent | indent
-
 curl -s -L -o "$APT_CACHE_DIR/archives/datadog-agent_5.17.1-1_amd64.deb" "https://s3.amazonaws.com/apt.datadoghq.com/pool/d/da/datadog-agent_5.17.1-1_amd64.deb"
 
 DEB=$(ls -t $APT_CACHE_DIR/archives/*.deb | head -n 1)
